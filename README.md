@@ -1,105 +1,152 @@
-
-# EquiP: Machine Learning Model for Predicting Equilibrium Plateau Pressure of Metal Composition
+# EquiP: Equilibrium Plateau Pressure Predictor for Metal Hydrides
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-orange.svg)](https://scikit-learn.org/)
 
-## Project Overview
+A machine learning framework for predicting the natural log of equilibrium plateau pressure [**ln(P_eq / MPa)**] of metal hydrides as a function of temperature. EquiP generates complete **Van't Hoff plots** (ln P_eq vs. 1/T), enabling rapid estimation of:
 
-Metal hydrides play a pivotal role in a wide range of technologies, including hydrogen storage, compression, heat management, and catalysis. Their performance is fundamentally governed by the thermodynamics of metal–hydrogen interactions, which determine key operational condition of these systems. One of the most critical thermodynamic parameters is the equilibrium plateau pressure (P<sub>eq</sub>), it defines the conditions under which hydrogen absorption and desorption occur, directly influencing the temperature and pressure ranges suitable for system operation. Traditionally, determining P<sub>eq</sub> requires extensive experimental measurements, creating a bottleneck in the pace of materials discovery and optimization.
+- **ΔH** — enthalpy of hydride formation (kJ mol⁻¹)  
+- **ΔS** — entropy of hydride formation (J mol⁻¹ K⁻¹)
 
-🧠 Introducing EquiP
+without the need for expensive experimental measurements.
 
-EquiP is a machine learning framework designed to predict the ln(P<sub>eq</sub>) (in MPa) of metal hydrides as a function of temperature. Rather than providing only single-point predictions, EquiP generates complete Van’t Hoff plots (P<sub>eq</sub> vs. 1/T), enabling rapid estimation of key thermodynamic parameters: ΔH (enthalpy of hydride formation) and ΔS (entropy of hydride formation)
+---
+
+## Background
+
+Metal hydrides are critical to technologies including hydrogen storage, compression, heat pumps, and catalysis. Their thermodynamic behaviour is captured by the Van't Hoff relation:
+
+```
+ln(Peq) = ΔH / (R·T) − ΔS / R
+```
+
+Determining P_eq experimentally across a range of temperatures is time-consuming. EquiP replaces this with a **Kernel Ridge Regression (KRR)** model trained on a curated dataset of 293 data points from 77 compositions, using domain-informed elemental and hydriding descriptors.
+
+---
+
+## Repository Structure
+
 ```
 EquiP/
-│
-├── data/
-│   ├── EQUIP_Input.csv          # Main dataset (composition, features, target)
-│   ├── EQUIP_Input_Mg.csv            # Optional Mg-based subset for focused tests
-│
-├── model/
-│   ├── EquiP_Traning.ipynb        # Main ML workflow script (KRR training + Validation + SHAP + LOCO)
-│   ├── EquiP_Mg_XRD_Model.ipynb   # Model trained only on Mg-based compositions with XRD information
-│
-├── output/
-│   ├── parity_plot.png            # Predicted vs Experimental ln(Peq)
-│   ├── shap_summary.png           # SHAP feature importance summary
-│   ├── loco_results.csv           # Leave-One-Composition-Out (LOCO) validation
-│   ├── results_summary.txt        # Model performance report
-│
-├── README.md                      # Project documentation (this file)
-├── requirements.txt               # Python dependencies
-└── LICENSE                        # License file (e.g., MIT or CC BY 4.0)
+├── equip.py               # Main module: model, training, evaluation, plotting
+├── run_demo.py            # Minimal usage example
+├── Data/
+│   ├── EQUIP_Input.csv        # Full dataset (293 samples, 77 compositions)
+│   └── EQUIP_Input_Mg.csv     # Mg-based subset with XRD descriptors
+├── output/                    # Generated automatically: figures, metrics, model
+├── requirements.txt
+└── README.md
 ```
-⚙️ Installation
-1. Clone the repository
 
-    git clone https://github.com/ashwinidverma/EquiP.git
+---
 
-    cd EquiP
+## Installation
 
-2. Create a virtual environment
+```bash
+git clone https://github.com/ashwinidverma/EquiP.git
+cd EquiP
+python -m venv .venv
+source .venv/bin/activate         # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-    python -m venv venv
+---
 
-    source venv/bin/activate      # (or venv\Scripts\activate on Windows)
+## Quick Start
 
+**Command-line**
 
-3. Install dependencies
+```bash
+python equip.py --data Data/EQUIP_Input.csv --output output --cv-folds 5
+```
 
-   pip install -r requirements.txt
+**Python API**
 
+```python
+from equip import EquiPConfig, run_equip_pipeline
 
-🚀 Usage
+cfg = EquiPConfig(cv_folds=5, output_dir="output")
+results = run_equip_pipeline("Data/EQUIP_Input.csv", config=cfg)
 
-Run the main model
+model   = results["model"]
+metrics = results["cv_metrics"]
+print(metrics)   # MAE, RMSE, R²
+```
 
-To train and evaluate EquiP: python model/EquiP_Traning.ipynb
+**CLI flags**
 
-To train and evaluate Mg-EquiP with XRD: python model/EquiP_Mg_XRD_Model.ipynb 
+| Flag | Description |
+|---|---|
+| `--data PATH` | Path to input CSV (default: `Data/EQUIP_Input.csv`) |
+| `--output DIR` | Output directory (default: `output/`) |
+| `--cv-folds N` | Number of CV folds (default: 5) |
+| `--no-tune` | Skip hyperparameter grid search |
+| `--no-loco` | Skip LOCO validation |
+| `--no-shap` | Skip SHAP analysis |
 
+---
 
-This script:
+## Model Details
 
-Loads and preprocesses the dataset
+| Component | Choice |
+|---|---|
+| Algorithm | Kernel Ridge Regression (KRR) |
+| Kernel | Radial Basis Function (RBF) |
+| Feature scaling | StandardScaler (zero mean, unit variance) |
+| Hyperparameter search | 5-fold GridSearchCV over α ∈ [10⁻⁴, 10], γ ∈ [10⁻⁴, 1] |
+| Validation | K-fold CV + Leave-One-Composition-Out (LOCO) |
 
-Trains a Kernel Ridge Regression (KRR) model with RBF kernel
+**Feature set** includes: temperature (K), elemental descriptors (electronegativity difference ΔEN, volume mismatch ΔVol, hydride formation energy E_hyd, …), and structural/hydriding features.
 
-Generates parity and SHAP plots
+---
 
-Performs cross-validation and LOCO tests
+## Outputs
 
-Saves all outputs in the output/ folder
+All outputs are written to the directory specified by `--output`:
 
-🧠 Key Features
+| File | Description |
+|---|---|
+| `parity_plot.png` | Predicted vs. experimental ln(P_eq) — full-data fit |
+| `parity_plot_loco.png` | Predicted vs. experimental ln(P_eq) — LOCO validation |
+| `shap_summary.png` | SHAP beeswarm plot (feature importance) |
+| `loco_bar.png` | Per-composition LOCO RMSE bar chart |
+| `loco_results.csv` | Per-composition MAE, RMSE, R² from LOCO |
+| `results_summary.txt` | Human-readable performance report |
+| `equip_model.joblib` | Serialised fitted model (reload with `EquiPModel.load()`) |
 
-  Experimental Dataset: consisting of 293 data points extracted from Van't Hoff plots of 77 compositions.
-  
-  Feature Set: Includes temperature, elemental, and hydriding features (e.g., Ehyd, ΔEN, ΔVol, etc.)
+---
 
-  Thermodynamic consistency: Model predictions can reproduce ΔH and ΔS from Van’t Hoff behavior.
+## Reproducing the Paper Results
 
-  LOCO validation: Evaluate model reliability for unseen compositions.
+```bash
+# Full dataset
+python equip.py --data Data/EQUIP_Input.csv --output output
 
-  Interpretability: SHAP analysis provides insight into which features most strongly affect P<sub>eq</sub>.
+# Mg-based subset with XRD features
+python equip.py --data Data/EQUIP_Input_Mg.csv --output output_Mg
+```
 
-📈 Results & Insights
+---
 
-Comparative analyses demonstrate that incorporating domain-informed features and structural descriptors significantly improves model performance. Even with limited data, intelligen feature design grounded in domain knowledge enables improved predictions of complex material properties.
+## Citation
 
-🧩 Citation
+```bibtex
+@article{verma2025equip,
+  title   = {What drives property prediction for solid-state hydrogen storage?
+             Data or smart features?},
+  author  = {Verma, Ashwini and Joshi, Kavita},
+  journal = {ChemRxiv},
+  year    = {2025},
+  doi     = {10.26434/chemrxiv-2025-9cvm9}
+}
+```
 
-Verma, A.; Joshi, K. (2025). *What drives property prediction for solid-state hydrogen storage? Data or smart features?* **ChemRxiv.** [https://doi.org/10.26434/chemrxiv-2025-9cvm9](https://doi.org/10.26434/chemrxiv-2025-9cvm9)
+---
 
+## Contact
 
-## Contact / Collaboration
+**Ashwini D. Verma**  
+ashwini.dverma@gmail.com · [LinkedIn](https://www.linkedin.com/in/ashwinidverma/)
 
-For questions, feedback, or collaboration, feel free to reach out:
-
-- **Email:** ashwini.dverma@gmail.com  
-- **LinkedIn:** [Ashwini Verma](https://www.linkedin.com/in/ashwinidverma/)  
-
-You are also welcome to open issues or pull requests directly on this repository for feedback or improvements.
-
-
-
+Issues and pull requests are welcome.
