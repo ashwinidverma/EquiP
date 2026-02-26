@@ -6,8 +6,8 @@
 
 A machine learning framework for predicting the natural log of equilibrium plateau pressure [**ln(P_eq / MPa)**] of metal hydrides as a function of temperature. EquiP generates complete **Van't Hoff plots** (ln P_eq vs. 1/T), enabling rapid estimation of:
 
-- **ΔH** — enthalpy of hydride formation (kJ mol⁻¹)  
-- **ΔS** — entropy of hydride formation (J mol⁻¹ K⁻¹)
+- **ΔH** - enthalpy of hydride formation (kJ mol⁻¹)  
+- **ΔS** - entropy of hydride formation (J mol⁻¹ K⁻¹)
 
 without the need for expensive experimental measurements.
 
@@ -83,7 +83,6 @@ print(metrics)   # MAE, RMSE, R²
 | `--cv-folds N` | Number of CV folds (default: 5) |
 | `--no-tune` | Skip hyperparameter grid search |
 | `--no-loco` | Skip LOCO validation |
-| `--no-shap` | Skip SHAP analysis |
 
 ---
 
@@ -97,7 +96,7 @@ print(metrics)   # MAE, RMSE, R²
 | Hyperparameter search | 5-fold GridSearchCV over α ∈ [10⁻⁴, 10], γ ∈ [10⁻⁴, 1] |
 | Validation | K-fold CV + Leave-One-Composition-Out (LOCO) |
 
-**Feature set** includes: temperature (K), elemental descriptors (electronegativity difference ΔEN, volume mismatch ΔVol, hydride formation energy E_hyd, …), and structural/hydriding features.
+**Feature set** includes: temperature (K), elemental descriptors, and structural features.
 
 ---
 
@@ -107,9 +106,8 @@ All outputs are written to the directory specified by `--output`:
 
 | File | Description |
 |---|---|
-| `parity_plot.png` | Predicted vs. experimental ln(P_eq) — full-data fit |
-| `parity_plot_loco.png` | Predicted vs. experimental ln(P_eq) — LOCO validation |
-| `shap_summary.png` | SHAP beeswarm plot (feature importance) |
+| `parity_plot.png` | Predicted vs. experimental ln(P_eq) - full-data fit |
+| `parity_plot_loco.png` | Predicted vs. experimental ln(P_eq) - LOCO validation |
 | `loco_bar.png` | Per-composition LOCO RMSE bar chart |
 | `loco_results.csv` | Per-composition MAE, RMSE, R² from LOCO |
 | `results_summary.txt` | Human-readable performance report |
@@ -123,8 +121,7 @@ All outputs are written to the directory specified by `--output`:
 # Full dataset
 python equip.py --data Data/EQUIP_Input.csv --output output
 
-# Mg-based subset with XRD features
-python equip.py --data Data/EQUIP_Input_Mg.csv --output output_Mg
+
 ```
 
 ---
